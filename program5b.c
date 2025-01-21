@@ -13,7 +13,16 @@ int main()
     else if(pid>0)
     {
         printf("parent process id: %d",getpid());
-        wait(NULL);
+        pid_t pid=fork();
+        if(pid==0)
+        {
+            printf("child process id: %d",getpid());
+        }
+        else
+        {
+            wait(NULL);
+            wait(NULL);
+        }
     }
     else
     {
