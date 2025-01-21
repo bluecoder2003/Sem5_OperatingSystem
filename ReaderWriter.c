@@ -1,61 +1,67 @@
-#include <semaphore.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
 
-sem_t x, y;
-pthread_t writerthreads[100], readerthreads[100];
-int readercount = 0;
+pthread_mutex_t wrt, mut;
+int rc = 0;
 
-void *reader(void* param) {
-    sem_wait(&x);
-    readercount++;
-    if (readercount == 1)
-        sem_wait(&y);
-    sem_post(&x);
+void *writer(void *args) {
+  int id = *(int *)args;
 
-    printf("\n%d reader is inside", readercount);
-    
-    sem_wait(&x);
-    readercount--;
-    if (readercount == 0) {
-        sem_post(&y);
-    }
-    sem_post(&x);
+  while (1) {
+    pthread_mutex_lock(&wrt);//wait
+    printf("Writer %d Writing\n", id);
+    pthread_mutex_unlock(&wrt);//sigmal
+    sleep(1);
+  }
 
-    printf("\n%d Reader is leaving", readercount + 1);
-    return NULL;
+  return NULL;
 }
 
-void *writer(void* param) {
-    printf("\nWriter is trying to enter");
-    sem_wait(&y);
-    printf("\nWriter has entered");
-    sem_post(&y);
-    printf("\nWriter is leaving");
-    return NULL;
+void *reader(void *args) {
+  int id = *(int *)args;
+
+  while (1) {
+    pthread_mutex_lock(&mut);
+    rc++;
+    if (rc == 1)
+      pthread_mutex_lock(&wrt);
+    pthread_mutex_unlock(&mut);
+
+    printf("Reader %d Reading\n", id);
+
+    pthread_mutex_lock(&mut);
+    rc--;
+    if (rc == 0)
+      pthread_mutex_unlock(&wrt);
+    pthread_mutex_unlock(&mut);
+    sleep(1);
+  }
+
+  return NULL;
 }
 
 int main() {
-    int n2, i;
-    printf("Enter the number of readers and writers: ");
-    scanf("%d", &n2);
+  pthread_mutex_init(&wrt, NULL);
+  pthread_mutex_init(&mut, NULL);
 
-    sem_init(&x, 0, 1);
-    sem_init(&y, 0, 1);
+  pthread_t writer_thread[2], reader_thread[5];
 
-    for (i = 0; i < n2; i++) {
-        pthread_create(&writerthreads[i], NULL, reader, NULL);
-        pthread_create(&readerthreads[i], NULL, writer, NULL);
-    }
+  for (int i = 0; i < 2; i++) {
+    pthread_create(&writer_thread[i], NULL, writer, &i);
+  }
 
-    for (i = 0; i < n2; i++) {
-        pthread_join(writerthreads[i], NULL);
-        pthread_join(readerthreads[i], NULL);
-    }
+  for (int i = 0; i < 5; i++) {
+    pthread_create(&reader_thread[i], NULL, reader, &i);
+  }
 
-    sem_destroy(&x);
-    sem_destroy(&y);
+  for (int i = 0; i < 2; i++) {
+    pthread_join(writer_thread[i], NULL);
+  }
 
-    return 0;
+  for (int i = 0; i < 5; i++) {
+    pthread_join(reader_thread[i], NULL);
+  }
+
+  return 0;
 }
